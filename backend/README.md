@@ -1,98 +1,125 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Backend (NestJS monorepo)
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Kafka-based **microservices** and an **HTTP API gateway**, sharing `libs/` (common config, contracts, database helpers). See the **[repository root README](../README.md)** for Docker Compose, Task workflows, and full-stack setup.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Applications (`apps/`)
 
-## Description
+| App               | Role                                                                                   |
+| ----------------- | -------------------------------------------------------------------------------------- |
+| `api-gateway`     | Public HTTP API (catalog, auth, users, orders); calls other services via Kafka clients |
+| `user-service`    | User profiles and identity-related RPC                                                 |
+| `auth-service`    | Register, login, logout; JWT issuance                                                  |
+| `product-service` | Catalog RPC; Prisma + optional Redis cache                                             |
+| `order-service`   | Checkout and order RPC; orchestrates other services over Kafka                         |
+| `payment-service` | Payment RPC for orders                                                                 |
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Shared libraries (`libs/`)
 
-## Project setup
+- **`common`** — Kafka options, Redis module, guards, RPC helpers, observability hooks
+- **`contracts`** — Shared TypeScript types and Kafka message pattern constants
+- **`database`** — Prisma client singleton helpers
 
-```bash
-$ npm install
-```
+## Prerequisites
 
-## Compile and run the project
+- Node.js 22.x recommended
+- Running **Kafka**, **PostgreSQL** (four databases), and **Redis** as described in the root README (Docker Compose)
+
+## Install
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm install
 ```
 
-## Run tests
+`postinstall` runs **`npm run prisma:generate`** so `@prisma-user/client`, `@prisma-product/client`, `@prisma-order/client`, and `@prisma-payment/client` exist under `node_modules/`.
+
+## Environment
+
+Copy and edit:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+cp .env.example .env
 ```
 
-## Deployment
+Key variables: per-service `*_DATABASE_URL`, `KAFKA_BROKERS`, `REDIS_URL`, `AUTH_JWT_SECRET`, `API_GATEWAY_PORT`, optional `API_GATEWAY_CORS_ORIGIN` and OpenTelemetry / Grafana settings (see `.env.example`).
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## Run (development)
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+From `backend/`:
+
+| Script                              | Service         |
+| ----------------------------------- | --------------- |
+| `npm run start:dev`                 | API gateway     |
+| `npm run start:user-service:dev`    | User service    |
+| `npm run start:auth-service:dev`    | Auth service    |
+| `npm run start:product-service:dev` | Product service |
+| `npm run start:order-service:dev`   | Order service   |
+| `npm run start:payment-service:dev` | Payment service |
+
+Or use **`task dev`** / **`task start:all`** from the repository root.
+
+## Build
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npm run build
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Production entry for the gateway:
 
-## Resources
+```bash
+npm run start:prod
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+Other services: run `node` on the matching `dist/apps/<app>/apps/<app>/src/main.js` (see `docker-entrypoint.sh` and `Dockerfile`).
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+## Prisma
 
-## Support
+Each service with a database has its own schema under `apps/<service>/prisma/schema.prisma`.
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+```bash
+npm run prisma:generate
+```
 
-## Stay in touch
+Apply schema to databases (local dev often uses `db push` from the root Taskfile):
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```bash
+npx prisma db push --schema=apps/user-service/prisma/schema.prisma
+# … repeat for product, order, payment
+```
 
-## License
+Seed sample catalog data:
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+```bash
+npm run prisma:seed:product
+```
+
+## Docker image
+
+Single image; set **`NEST_APP`** to `api-gateway`, `user-service`, etc.
+
+```bash
+docker build -t e-commerce-backend:latest .
+```
+
+## Load tests (k6)
+
+```bash
+npm run k6:smoke
+npm run k6:load-catalog
+npm run k6:smoke:docker   # if k6 is not installed locally
+```
+
+## Tests and lint
+
+```bash
+npm run test
+npm run test:e2e
+npm run lint
+```
+
+## Observability
+
+Config samples live under **`observability/`** (OpenTelemetry collector, Grafana dashboard skeleton). Optional Docker service: `otel-collector` in root `docker-compose.yml`.
+
+## Kubernetes
+
+Manifests: **`../deploy/k8s/`** (Kustomize). Image name in overlays should match your registry build of this Dockerfile.
