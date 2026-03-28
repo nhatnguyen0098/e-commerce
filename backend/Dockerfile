@@ -3,13 +3,14 @@ FROM node:22-alpine AS builder
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 COPY package.json package-lock.json ./
+# Skip lifecycle scripts: postinstall runs prisma:generate before COPY . . (no apps/*/prisma yet).
 RUN npm ci --ignore-scripts
 COPY . .
 ARG PRISMA_DUMMY_URL="postgresql://build:build@127.0.0.1:5432/build?schema=public"
 ENV USER_DATABASE_URL=${PRISMA_DUMMY_URL} \
-  PRODUCT_DATABASE_URL=${PRISMA_DUMMY_URL} \
-  ORDER_DATABASE_URL=${PRISMA_DUMMY_URL} \
-  PAYMENT_DATABASE_URL=${PRISMA_DUMMY_URL}
+    PRODUCT_DATABASE_URL=${PRISMA_DUMMY_URL} \
+    ORDER_DATABASE_URL=${PRISMA_DUMMY_URL} \
+    PAYMENT_DATABASE_URL=${PRISMA_DUMMY_URL}
 RUN npx prisma generate --schema=apps/user-service/prisma/schema.prisma \
   && npx prisma generate --schema=apps/product-service/prisma/schema.prisma \
   && npx prisma generate --schema=apps/order-service/prisma/schema.prisma \
