@@ -1,0 +1,4 @@
+node_modules
+dist
+.env
+libs/database/src/generated

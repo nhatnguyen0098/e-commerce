@@ -1,0 +1,66 @@
+{
+  "title": "E-commerce Kafka RPC and Saga",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "title": "Kafka RPC Requests by Pattern",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (pattern) (count_over_time({job=\"otel-collector\"} |= \"\\\"event\\\":\\\"kafka_rpc\\\"\" | json [5m]))"
+        }
+      ]
+    },
+    {
+      "title": "Kafka RPC Timeout Rate by Pattern",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (pattern) (count_over_time({job=\"otel-collector\"} |= \"\\\"event\\\":\\\"kafka_rpc\\\"\" |= \"\\\"outcome\\\":\\\"timeout\\\"\" | json [5m]))"
+        }
+      ]
+    },
+    {
+      "title": "Kafka RPC Error Rate by Pattern",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (pattern) (count_over_time({job=\"otel-collector\"} |= \"\\\"event\\\":\\\"kafka_rpc\\\"\" |= \"\\\"outcome\\\":\\\"error\\\"\" | json [5m]))"
+        }
+      ]
+    },
+    {
+      "title": "Kafka RPC P95 Duration by Pattern",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "quantile_over_time(0.95, ({job=\"otel-collector\"} |= \"\\\"event\\\":\\\"kafka_rpc\\\"\" | json | unwrap durationMs)[5m])"
+        }
+      ]
+    },
+    {
+      "title": "Checkout Saga Success vs Compensated",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"otel-collector\"} |= \"\\\"event\\\":\\\"order_checkout_saga\\\"\" |= \"\\\"status\\\":\\\"SUCCEEDED\\\"\" [5m]))"
+        },
+        {
+          "expr": "sum(count_over_time({job=\"otel-collector\"} |= \"\\\"event\\\":\\\"order_checkout_saga\\\"\" |= \"\\\"status\\\":\\\"COMPENSATED\\\"\" [5m]))"
+        }
+      ]
+    },
+    {
+      "title": "Checkout Saga Step Distribution",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (step, status) (count_over_time({job=\"otel-collector\"} |= \"\\\"event\\\":\\\"order_checkout_saga\\\"\" | json [5m]))"
+        }
+      ]
+    }
+  ]
+}

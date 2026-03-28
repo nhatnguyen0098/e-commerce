@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+  labels:
+    app: product-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: product-service
+  template:
+    metadata:
+      labels:
+        app: product-service
+    spec:
+      containers:
+        - name: app
+          image: e-commerce-backend:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NEST_APP
+              value: product-service
+          envFrom:
+            - configMapRef:
+                name: e-commerce-config
+            - secretRef:
+                name: e-commerce-secrets

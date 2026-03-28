@@ -1,0 +1,85 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: kafka-rpc-and-saga
+    folder: e-commerce
+    interval: 1m
+    rules:
+      - uid: kafka_rpc_timeout_spike
+        title: Kafka RPC timeout spike
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: grafanacloud-prom
+            model:
+              expr: sum(count_over_time({job="otel-collector"} |= "\"event\":\"kafka_rpc\"" |= "\"outcome\":\"timeout\"" [5m]))
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [1]
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+      - uid: checkout_saga_compensated
+        title: Checkout saga compensation detected
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: grafanacloud-prom
+            model:
+              expr: sum(count_over_time({job="otel-collector"} |= "\"event\":\"order_checkout_saga\"" |= "\"status\":\"COMPENSATED\"" [5m]))
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        for: 2m
+        noDataState: NoData
+        execErrState: Error
+      - uid: checkout_latency_p95_high
+        title: Checkout latency p95 is high
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: grafanacloud-prom
+            model:
+              expr: quantile_over_time(0.95, ({job="otel-collector"} |= "\"event\":\"kafka_rpc\"" |= "\"pattern\":\"orders-checkout\"" | json | unwrap durationMs)[5m])
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [5000]
+        for: 5m
+        noDataState: NoData
+        execErrState: Error

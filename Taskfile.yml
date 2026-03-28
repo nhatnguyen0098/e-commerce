@@ -1,0 +1,162 @@
+version: "3"
+
+tasks:
+  kafka:start:
+    desc: Start Kafka broker (docker compose)
+    cmds:
+      - docker compose up -d kafka
+      - task kafka:wait
+      - task kafka:init-topics
+
+  kafka:wait:
+    desc: Wait until Kafka is ready
+    cmds:
+      - |
+        set -e
+        for i in $(seq 1 30); do
+          if docker compose exec -T kafka kafka-topics --bootstrap-server 127.0.0.1:9092 --list >/dev/null 2>&1; then
+            echo "Kafka is ready"
+            exit 0
+          fi
+          echo "Waiting for Kafka... ($i/30)"
+          sleep 2
+        done
+        echo "Kafka did not become ready in time"
+        exit 1
+
+  kafka:init-topics:
+    desc: Create required Kafka topics for RPC and replies
+    cmds:
+      - |
+        set -e
+        TOPICS="\
+        auth-register auth-login auth-logout \
+        get-user-by-id user-check-exists user-create user-get-by-email user-get-by-phone user-update \
+        catalog-list-categories catalog-list-brands catalog-list-products catalog-get-product-by-slug catalog-validate-checkout-lines \
+        orders-admin-test orders-checkout orders-list-mine orders-get-mine-by-id \
+        payments-create-for-order payments-list-by-order-id \
+        auth-register.reply auth-login.reply auth-logout.reply \
+        get-user-by-id.reply user-check-exists.reply user-create.reply user-get-by-email.reply user-get-by-phone.reply user-update.reply \
+        catalog-list-categories.reply catalog-list-brands.reply catalog-list-products.reply catalog-get-product-by-slug.reply catalog-validate-checkout-lines.reply \
+        orders-admin-test.reply orders-checkout.reply orders-list-mine.reply orders-get-mine-by-id.reply \
+        payments-create-for-order.reply payments-list-by-order-id.reply"
+        for topic in $TOPICS; do
+          docker compose exec -T kafka kafka-topics --bootstrap-server 127.0.0.1:9092 --create --if-not-exists --topic "$topic" --partitions 1 --replication-factor 1 >/dev/null
+        done
+        echo "Kafka topics initialized"
+
+  kafka:clean:
+    desc: Remove Kafka container and volume data
+    cmds:
+      - docker compose down --remove-orphans
+      - docker volume rm e-commerce_e_commerce_kafka || true
+
+  db:up:
+    desc: Start PostgreSQL and Redis (docker compose)
+    cmds:
+      - docker compose up -d postgres-user postgres-product postgres-order postgres-payment redis
+
+  db:migrate:
+    desc: Apply Prisma schema to all service databases
+    dir: backend
+    cmds:
+      - npx prisma db push --schema=apps/user-service/prisma/schema.prisma
+      - npx prisma db push --schema=apps/product-service/prisma/schema.prisma
+      - npx prisma db push --schema=apps/order-service/prisma/schema.prisma
+      - npx prisma db push --schema=apps/payment-service/prisma/schema.prisma
+
+  db:drop-legacy:
+    desc: Drop legacy shared database
+    cmds:
+      - docker compose exec -T postgres-user psql -U admin -d postgres -c "DROP DATABASE IF EXISTS car_booking;"
+
+  install:
+    desc: Install backend dependencies
+    dir: backend
+    cmds:
+      - npm install
+
+  up:
+    desc: Start api-gateway, user-service, auth-service, product-service, order-service, payment-service
+    cmds:
+      - |
+        set -e
+        (cd backend && npm run start:user-service:dev) &
+        (cd backend && npm run start:auth-service:dev) &
+        (cd backend && npm run start:product-service:dev) &
+        (cd backend && npm run start:order-service:dev) &
+        (cd backend && npm run start:payment-service:dev) &
+        (cd backend && npm run start:dev) &
+        (cd frontend && npm run dev) &
+        echo "Services started: api-gateway, user-service, auth-service, product-service, order-service, payment-service"
+        echo "Run 'task down' to stop all services"
+        wait
+
+  down:
+    desc: Stop all backend local services
+    cmds:
+      - pkill -f "dist/apps/api-gateway/main" || true
+      - pkill -f "dist/apps/user-service/main" || true
+      - pkill -f "dist/apps/auth-service/main" || true
+      - pkill -f "dist/apps/product-service/main" || true
+      - pkill -f "dist/apps/order-service/main" || true
+      - pkill -f "dist/apps/payment-service/main" || true
+
+  dev:
+    desc: Install deps and start all local services
+    deps:
+      - install
+      - up
+
+  start:all:
+    desc: Start full local stack (db, kafka, backend services, frontend)
+    cmds:
+      - task db:up
+      - task db:migrate
+      - task kafka:start
+      # - task observability:start
+      - task dev
+
+  containers:down:
+    desc: Stop all docker compose containers of this project
+    cmds:
+      - docker compose down --remove-orphans
+
+  observability:start:
+    desc: Start OpenTelemetry collector for Grafana Cloud
+    cmds:
+      - |
+        set -e
+        set -a
+        [ -f backend/.env ] && . backend/.env
+        set +a
+        docker compose up -d otel-collector
+      - task observability:check
+
+  observability:down:
+    desc: Stop OpenTelemetry collector
+    cmds:
+      - docker compose stop otel-collector
+
+  observability:check:
+    desc: Check OpenTelemetry collector health endpoint
+    cmds:
+      - |
+        set -e
+        curl -fsS http://127.0.0.1:13133/health/status >/dev/null
+        echo "OpenTelemetry collector is healthy"
+
+  observability:check-env:
+    desc: Validate Grafana Cloud env vars are provided
+    cmds:
+      - |
+        set -e
+        set -a
+        [ -f backend/.env ] && . backend/.env
+        set +a
+        [ -n "${GRAFANA_CLOUD_USER_ID:-}" ] || (echo "Missing GRAFANA_CLOUD_USER_ID" && exit 1)
+        [ -n "${GRAFANA_CLOUD_API_KEY:-}" ] || (echo "Missing GRAFANA_CLOUD_API_KEY" && exit 1)
+        [ -n "${GRAFANA_CLOUD_OTLP_ENDPOINT:-}" ] || (echo "Missing GRAFANA_CLOUD_OTLP_ENDPOINT" && exit 1)
+        [ -n "${GRAFANA_CLOUD_PROM_REMOTE_WRITE_ENDPOINT:-}" ] || (echo "Missing GRAFANA_CLOUD_PROM_REMOTE_WRITE_ENDPOINT" && exit 1)
+        [ -n "${GRAFANA_CLOUD_LOKI_ENDPOINT:-}" ] || (echo "Missing GRAFANA_CLOUD_LOKI_ENDPOINT" && exit 1)
+        echo "Grafana Cloud env vars are present"

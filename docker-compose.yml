@@ -1,0 +1,133 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.117.0
+    command: ['--config=/etc/otelcol-contrib/config.yaml']
+    restart: unless-stopped
+    environment:
+      GRAFANA_CLOUD_USER_ID: ${GRAFANA_CLOUD_USER_ID:-}
+      GRAFANA_CLOUD_API_KEY: ${GRAFANA_CLOUD_API_KEY:-}
+      GRAFANA_CLOUD_OTLP_ENDPOINT: ${GRAFANA_CLOUD_OTLP_ENDPOINT:-http://127.0.0.1:18081/otlp}
+      GRAFANA_CLOUD_PROM_REMOTE_WRITE_ENDPOINT: ${GRAFANA_CLOUD_PROM_REMOTE_WRITE_ENDPOINT:-http://127.0.0.1:18082/api/v1/write}
+      GRAFANA_CLOUD_LOKI_ENDPOINT: ${GRAFANA_CLOUD_LOKI_ENDPOINT:-http://127.0.0.1:18083/loki/api/v1/push}
+    ports:
+      - '4317:4317'
+      - '4318:4318'
+      - '8888:8888'
+      - '13133:13133'
+    volumes:
+      - ./backend/observability/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:13133/ || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    volumes:
+      - e_commerce_redis:/data
+
+  postgres-user:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 12345
+      POSTGRES_DB: ecom_user
+    ports:
+      - '5432:5432'
+    volumes:
+      - e_commerce_user:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U admin -d ecom_user']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-product:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 12345
+      POSTGRES_DB: ecom_product
+    ports:
+      - '5433:5432'
+    volumes:
+      - e_commerce_product:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U admin -d ecom_product']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-order:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 12345
+      POSTGRES_DB: ecom_order
+    ports:
+      - '5434:5432'
+    volumes:
+      - e_commerce_order:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U admin -d ecom_order']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-payment:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 12345
+      POSTGRES_DB: ecom_payment
+    ports:
+      - '5435:5432'
+    volumes:
+      - e_commerce_payment:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U admin -d ecom_payment']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    ports:
+      - '9092:9092'
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_LISTENERS: 'PLAINTEXT://:9092,CONTROLLER://:9093'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://127.0.0.1:9092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@127.0.0.1:9093'
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_NUM_PARTITIONS: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      CLUSTER_ID: '4L6g3nShT-eMCtK--X86sw'
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'kafka-topics --bootstrap-server 127.0.0.1:9092 --list >/dev/null 2>&1',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - e_commerce_kafka:/var/lib/kafka/data
+
+volumes:
+  e_commerce_user:
+  e_commerce_product:
+  e_commerce_order:
+  e_commerce_payment:
+  e_commerce_redis:
+  e_commerce_kafka:

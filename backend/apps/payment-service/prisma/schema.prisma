@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/@prisma-payment/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("PAYMENT_DATABASE_URL")
+}
+
+enum PaymentStatus {
+  PENDING
+  REQUIRES_ACTION
+  COMPLETED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentProvider {
+  STRIPE
+  PAYPAL
+  MANUAL
+  COD
+}
+
+model Payment {
+  id          String          @id @default(uuid())
+  orderId     String          @map("order_id")
+  provider    PaymentProvider
+  status      PaymentStatus   @default(PENDING)
+  amount      Decimal         @db.Decimal(12, 2)
+  currency    String          @default("VND") @db.Char(3)
+  externalId  String?         @map("external_id")
+  metadata    Json?
+  failureCode String?         @map("failure_code")
+  failureMsg  String?         @map("failure_msg") @db.Text
+  paidAt      DateTime?       @map("paid_at")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  @@index([orderId])
+  @@index([status])
+  @@index([externalId])
+  @@map("payments")
+}

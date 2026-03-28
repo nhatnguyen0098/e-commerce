@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  labels:
+    app: payment-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      labels:
+        app: payment-service
+    spec:
+      containers:
+        - name: app
+          image: e-commerce-backend:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NEST_APP
+              value: payment-service
+          envFrom:
+            - configMapRef:
+                name: e-commerce-config
+            - secretRef:
+                name: e-commerce-secrets

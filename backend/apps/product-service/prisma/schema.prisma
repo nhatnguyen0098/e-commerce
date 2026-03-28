@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/@prisma-product/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("PRODUCT_DATABASE_URL")
+}
+
+model Category {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  parentId  String?  @map("parent_id")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryHierarchy")
+  products Product[]
+
+  @@index([parentId])
+  @@map("categories")
+}
+
+model Product {
+  id             String   @id @default(uuid())
+  categoryId     String?  @map("category_id")
+  name           String
+  slug           String   @unique
+  brand          String   @default("")
+  description    String?  @db.Text
+  sku            String   @unique
+  price          Decimal  @db.Decimal(12, 2)
+  compareAtPrice Decimal? @map("compare_at_price") @db.Decimal(12, 2)
+  stockQuantity  Int      @default(0) @map("stock_quantity")
+  isActive       Boolean  @default(true) @map("is_active")
+  images         Json     @default("[]")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([brand])
+  @@map("products")
+}

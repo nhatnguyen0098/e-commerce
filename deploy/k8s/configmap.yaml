@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: e-commerce-config
+  namespace: e-commerce
+data:
+  NODE_ENV: production
+  API_GATEWAY_PORT: "3000"
+  KAFKA_BROKERS: kafka:9092
+  REDIS_URL: redis://redis:6379
+  CATALOG_CACHE_TTL_SECONDS: "90"
+  AUTH_JWT_EXPIRES_IN: 1h

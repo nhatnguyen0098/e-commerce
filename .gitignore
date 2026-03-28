@@ -1,0 +1,33 @@
+# Dependencies & build
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+*.tsbuildinfo
+
+# Env & secrets (never commit)
+.env
+.env.*
+!.env.example
+**/secret.env
+deploy/k8s/secret.env
+
+# Logs & OS
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Misc
+*.local
