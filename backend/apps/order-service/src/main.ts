@@ -3,8 +3,8 @@ import { NestFactory } from '@nestjs/core';
 import { KafkaOptions } from '@nestjs/microservices';
 import { buildKafkaMicroserviceOptions } from '@common/configs/build-kafka-microservice-options';
 import { getConfig } from '@common/configs/get-config';
-import { getPrismaClient } from '@database/prisma.singleton';
 import { AppModule } from './app.module';
+import { getOrderPrismaClient } from './order-prisma-client';
 
 async function bootstrap(): Promise<void> {
   process.env.DATABASE_URL = getConfig({
@@ -20,7 +20,7 @@ async function bootstrap(): Promise<void> {
   );
   app.enableShutdownHooks();
   await app.listen();
-  const prisma = getPrismaClient();
+  const prisma = getOrderPrismaClient();
   const shutdown = async (): Promise<void> => {
     await prisma.$disconnect();
     await app.close();

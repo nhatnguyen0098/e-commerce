@@ -17,7 +17,7 @@ Kafka-based **microservices** and an **HTTP API gateway**, sharing `libs/` (comm
 
 - **`common`** — Kafka options, Redis module, guards, RPC helpers, observability hooks
 - **`contracts`** — Shared TypeScript types and Kafka message pattern constants
-- **`database`** — Prisma client singleton helpers
+- **`database`** — Shared `getOrCreatePrismaClient` helper; each app wraps its generated Prisma client
 
 ## Prerequisites
 
